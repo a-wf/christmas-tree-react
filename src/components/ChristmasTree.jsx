@@ -14,6 +14,9 @@ import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision'
 
+// Base URL for assets (handles GitHub Pages paths)
+const BASE_URL = import.meta.env.BASE_URL || '/'
+
 // Configuration
 const CONFIG = {
   TREE_POINTS: 50000,
@@ -35,7 +38,7 @@ const COLOR_THEMES = {
     ground: { r: [100, 150], g: [150, 200], b: 255 },
     heart: [255, 220, 50],
     stars: [215, 255],
-    music: '/calm-christmas-piano-262888.mp3',
+    music: `${BASE_URL}calm-christmas-piano-262888.mp3`,
   },
   traditional: {
     name: 'Christmas Green',
@@ -43,7 +46,7 @@ const COLOR_THEMES = {
     ground: { r: [34, 80], g: [80, 120], b: [34, 60] },
     heart: [255, 215, 0],
     stars: [200, 255],
-    music: '/we-wish-you-a-merry-christmas-452819.mp3',
+    music: `${BASE_URL}we-wish-you-a-merry-christmas-452819.mp3`,
   },
   red: {
     name: 'Vermillion Red',
@@ -51,7 +54,7 @@ const COLOR_THEMES = {
     ground: { r: [139, 200], g: [0, 50], b: [0, 30] },
     heart: [255, 215, 0],
     stars: [255, 200],
-    music: '/merry-christmas-261280.mp3',
+    music: `${BASE_URL}merry-christmas-261280.mp3`,
   },
   blue: {
     name: 'Ice Blue',
@@ -59,7 +62,7 @@ const COLOR_THEMES = {
     ground: { r: [0, 50], g: [50, 150], b: 255 },
     heart: [255, 255, 200],
     stars: [150, 255],
-    music: '/winter-day-christmas-holidays-270802.mp3',
+    music: `${BASE_URL}winter-day-christmas-holidays-270802.mp3`,
   },
   purple: {
     name: 'Purple Dream',
@@ -67,7 +70,7 @@ const COLOR_THEMES = {
     ground: { r: [75, 150], g: [0, 80], b: [130, 255] },
     heart: [255, 215, 0],
     stars: [180, 255],
-    music: '/christmas-jazz-short-450773.mp3',
+    music: `${BASE_URL}christmas-jazz-short-450773.mp3`,
   },
 }
 
