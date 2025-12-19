@@ -35,6 +35,7 @@ const COLOR_THEMES = {
     ground: { r: [100, 150], g: [150, 200], b: 255 },
     heart: [255, 220, 50],
     stars: [215, 255],
+    music: '/calm-christmas-piano-262888.mp3',
   },
   traditional: {
     name: 'Christmas Green',
@@ -42,6 +43,7 @@ const COLOR_THEMES = {
     ground: { r: [34, 80], g: [80, 120], b: [34, 60] },
     heart: [255, 215, 0],
     stars: [200, 255],
+    music: '/we-wish-you-a-merry-christmas-452819.mp3',
   },
   red: {
     name: 'Vermillion Red',
@@ -49,6 +51,7 @@ const COLOR_THEMES = {
     ground: { r: [139, 200], g: [0, 50], b: [0, 30] },
     heart: [255, 215, 0],
     stars: [255, 200],
+    music: '/merry-christmas-261280.mp3',
   },
   blue: {
     name: 'Ice Blue',
@@ -56,6 +59,7 @@ const COLOR_THEMES = {
     ground: { r: [0, 50], g: [50, 150], b: 255 },
     heart: [255, 255, 200],
     stars: [150, 255],
+    music: '/winter-day-christmas-holidays-270802.mp3',
   },
   purple: {
     name: 'Purple Dream',
@@ -63,6 +67,7 @@ const COLOR_THEMES = {
     ground: { r: [75, 150], g: [0, 80], b: [130, 255] },
     heart: [255, 215, 0],
     stars: [180, 255],
+    music: '/christmas-jazz-short-450773.mp3',
   },
 }
 
@@ -670,9 +675,33 @@ export default function ChristmasTree() {
   })
   const [gestureHint, setGestureHint] = useState('Initializing camera...')
   const [cameraActive, setCameraActive] = useState(false)
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false)
+  const audioRef = useRef(null)
   const videoRef = useRef(null)
   const handLandmarkerRef = useRef(null)
   const lastVideoTimeRef = useRef(-1)
+
+  // Auto-play music on load
+  useEffect(() => {
+    const tryAutoPlay = () => {
+      if (audioRef.current) {
+        // Try to play after a short delay to ensure audio is loaded
+        setTimeout(() => {
+          audioRef.current.play()
+            .then(() => {
+              setIsMusicPlaying(true)
+              console.log('Music auto-playing')
+            })
+            .catch(err => {
+              console.log('Autoplay blocked:', err)
+              setIsMusicPlaying(false)
+            })
+        }, 50)
+      }
+    }
+
+    tryAutoPlay()
+  }, [])
 
   // Initialize MediaPipe
   useEffect(() => {
@@ -793,6 +822,16 @@ export default function ChristmasTree() {
     const nextTheme = themes[nextIndex]
     setCurrentTheme(nextTheme)
     localStorage.setItem('christmasTheme', nextTheme)
+
+    // Change music and play
+    if (audioRef.current) {
+      audioRef.current.src = COLOR_THEMES[nextTheme].music
+      audioRef.current.play()
+        .then(() => {
+          setIsMusicPlaying(true)
+        })
+        .catch(err => console.error('Music play failed:', err))
+    }
   }
 
   const handleNameChange = (e) => {
@@ -813,7 +852,32 @@ export default function ChristmasTree() {
     }
   }
 
-  const displayName = userName.trim() || '[Name]'
+  const toggleMusic = () => {
+    if (!audioRef.current) return
+
+    if (isMusicPlaying) {
+      audioRef.current.pause()
+      setIsMusicPlaying(false)
+    } else {
+      // Try to load and play
+      audioRef.current.load()
+      const playPromise = audioRef.current.play()
+
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsMusicPlaying(true)
+            console.log('Music playing successfully')
+          })
+          .catch(err => {
+            console.error('Audio play failed:', err)
+            alert('Failed to play music. Please check your browser settings or try clicking again.')
+          })
+      }
+    }
+  }
+
+  const displayName = 'W.Yr.';//userName.trim() || '[Name]'
   const themeName = COLOR_THEMES[currentTheme].name
 
   return (
@@ -836,19 +900,22 @@ export default function ChristmasTree() {
         <h1 className="title">Merry Christmas {displayName}</h1>
         
         <div className="top-right-controls">
+          <button className="elegant-btn" onClick={toggleMusic}>
+            {isMusicPlaying ? '🔊 Music ON' : '🔇 Music OFF'}
+          </button>
           <button className="elegant-btn" onClick={toggleFullscreen}>
             ⛶ Fullscreen
           </button>
         </div>
 
         <div className="controls-container">
-          <input
+          {/* <input
             type="text"
             className="name-input"
             placeholder="Enter Name"
-            value={userName}
+            // value={userName}
             onChange={handleNameChange}
-          />
+          /> */}
           
           <button className="elegant-btn" onClick={cycleTheme}>
             🎨 {themeName}
@@ -872,6 +939,17 @@ export default function ChristmasTree() {
 
       {/* Gesture hint */}
       <div id="gesture-hint">{gestureHint}</div>
+
+      {/* Background Music */}
+      <audio
+        ref={audioRef}
+        loop
+        autoPlay
+        preload="auto"
+        src={COLOR_THEMES[currentTheme].music}
+        onPlay={() => setIsMusicPlaying(true)}
+        onPause={() => setIsMusicPlaying(false)}
+      />
 
       <Snowflakes />
     </>
