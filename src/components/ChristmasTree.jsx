@@ -680,28 +680,53 @@ export default function ChristmasTree() {
   const videoRef = useRef(null)
   const handLandmarkerRef = useRef(null)
   const lastVideoTimeRef = useRef(-1)
+  const userInteractedRef = useRef(false)
 
-  // Auto-play music on load
+  // Auto-play music on load and on first user interaction
   useEffect(() => {
     const tryAutoPlay = () => {
-      if (audioRef.current) {
-        // Try to play after a short delay to ensure audio is loaded
-        setTimeout(() => {
-          audioRef.current.play()
-            .then(() => {
-              setIsMusicPlaying(true)
-              console.log('Music auto-playing')
-            })
-            .catch(err => {
-              console.log('Autoplay blocked:', err)
-              setIsMusicPlaying(false)
-            })
-        }, 50)
+      if (audioRef.current && !userInteractedRef.current) {
+        audioRef.current.play()
+          .then(() => {
+            setIsMusicPlaying(true)
+            userInteractedRef.current = true
+            console.log('Music auto-playing')
+          })
+          .catch(err => {
+            console.log('Autoplay blocked, waiting for user interaction:', err)
+            setIsMusicPlaying(false)
+          })
       }
     }
 
-    tryAutoPlay()
-  }, [])
+    // Try immediate autoplay
+    const timer = setTimeout(tryAutoPlay, 100)
+
+    // Also try on first user interaction
+    const handleInteraction = () => {
+      if (!userInteractedRef.current && audioRef.current) {
+        audioRef.current.play()
+          .then(() => {
+            setIsMusicPlaying(true)
+            userInteractedRef.current = true
+            console.log('Music started after user interaction')
+          })
+          .catch(err => console.log('Play failed:', err))
+      }
+    }
+
+    // Listen for any user interaction
+    document.addEventListener('click', handleInteraction, { once: true })
+    document.addEventListener('keydown', handleInteraction, { once: true })
+    document.addEventListener('touchstart', handleInteraction, { once: true })
+
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('click', handleInteraction)
+      document.removeEventListener('keydown', handleInteraction)
+      document.removeEventListener('touchstart', handleInteraction)
+    }
+  }, [isMusicPlaying])
 
   // Initialize MediaPipe
   useEffect(() => {
@@ -729,6 +754,22 @@ export default function ChristmasTree() {
           if (videoRef.current) {
             videoRef.current.srcObject = stream
             
+            // Auto-play music after camera permission is granted
+            setTimeout(() => {
+              if (audioRef.current) {
+                // Check if audio is actually playing
+                if (audioRef.current.paused) {
+                  audioRef.current.play()
+                    .then(() => {
+                      setIsMusicPlaying(true)
+                      userInteractedRef.current = true
+                      console.log('Music started after camera permission granted')
+                    })
+                    .catch(err => console.log('Music play failed:', err))
+                }
+              }
+            }, 500)
+
             // Wait for video to be ready
             videoRef.current.addEventListener('loadeddata', () => {
               setCameraActive(true)
