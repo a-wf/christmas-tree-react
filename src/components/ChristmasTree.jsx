@@ -675,7 +675,7 @@ export default function ChristmasTree() {
   })
   const [gestureHint, setGestureHint] = useState('Initializing camera...')
   const [cameraActive, setCameraActive] = useState(false)
-  const [isMusicPlaying, setIsMusicPlaying] = useState(false)
+  const [isMusicPlaying, setIsMusicPlaying] = useState(true)
   const audioRef = useRef(null)
   const videoRef = useRef(null)
   const handLandmarkerRef = useRef(null)
