@@ -25,8 +25,8 @@ const CONFIG = {
   HEART_POINTS: 1000,
   SNOW2D_POINTS: 10,
   TREE_HEIGHT: 12.0,
-  CAM_DIST: 25,
-  CAM_HEIGHT: 6.0,
+  CAM_DIST: 27,
+  CAM_HEIGHT: 5.0,
   PITCH: -0.25,
 }
 
@@ -647,7 +647,7 @@ function Scene({ currentTheme, gestureState }) {
   })
 
   return (
-    <group ref={groupRef} position={[0, -3, 0]}>
+    <group ref={groupRef} position={[0, -5.5, 0]}>
       <Particles points={treePoints} mode={gestureState?.mode || 'TREE'} />
       <Particles points={groundPoints} mode={gestureState?.mode || 'TREE'} />
       <Particles points={starPoints} mode={gestureState?.mode || 'TREE'} />
@@ -679,6 +679,7 @@ export default function ChristmasTree() {
   const [gestureHint, setGestureHint] = useState('Initializing camera...')
   const [cameraActive, setCameraActive] = useState(false)
   const [isMusicPlaying, setIsMusicPlaying] = useState(true)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const audioRef = useRef(null)
   const videoRef = useRef(null)
   const handLandmarkerRef = useRef(null)
@@ -850,12 +851,26 @@ export default function ChristmasTree() {
     
     initMediaPipe()
     
+    // Listen for fullscreen changes
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange)
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange)
+
     return () => {
       if (animationId) cancelAnimationFrame(animationId)
       if (videoRef.current?.srcObject) {
         const tracks = videoRef.current.srcObject.getTracks()
         tracks.forEach(track => track.stop())
       }
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange)
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange)
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange)
     }
   }, [])
 
@@ -888,11 +903,17 @@ export default function ChristmasTree() {
     }
   }
 
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen()
-    } else {
-      document.exitFullscreen()
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen()
+        setIsFullscreen(true)
+      } else {
+        await document.exitFullscreen()
+        setIsFullscreen(false)
+      }
+    } catch (err) {
+      console.error('Fullscreen error:', err)
     }
   }
 
@@ -927,7 +948,7 @@ export default function ChristmasTree() {
   return (
     <>
       <Canvas
-        camera={{ position: [0, CONFIG.CAM_HEIGHT, CONFIG.CAM_DIST], fov: 45 }}
+        camera={{ position: [0, CONFIG.CAM_HEIGHT, CONFIG.CAM_DIST], fov: 40 }}
         style={{ background: '#000' }}
       >
         <Scene currentTheme={currentTheme} gestureState={gestureState} />
@@ -948,7 +969,7 @@ export default function ChristmasTree() {
             {isMusicPlaying ? '🔊 Music ON' : '🔇 Music OFF'}
           </button>
           <button className="elegant-btn" onClick={toggleFullscreen}>
-            ⛶ Fullscreen
+            {isFullscreen ? '⛶ Exit Fullscreen' : '⛶ Fullscreen'}
           </button>
         </div>
 
