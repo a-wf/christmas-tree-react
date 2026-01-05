@@ -591,17 +591,20 @@ function Snowflakes() {
 }
 
 // Photo Particles Component
-function PhotoParticles({ photos, mode, onClearExpanded }) {
+function PhotoParticles({ photos, mode, onClearExpanded, onGetExpanded }) {
   const meshRefs = useRef([])
   const { camera } = useThree()
   const [expandedPhotos, setExpandedPhotos] = useState(new Set())
 
-  // Expose clear function through callback
+  // Expose clear function and get function through callbacks
   useEffect(() => {
     if (onClearExpanded) {
       onClearExpanded(() => setExpandedPhotos(new Set()))
     }
-  }, [onClearExpanded])
+    if (onGetExpanded) {
+      onGetExpanded(() => expandedPhotos)
+    }
+  }, [onClearExpanded, onGetExpanded, expandedPhotos])
 
   useFrame((state, delta) => {
     // Skip updates in SCATTER mode
@@ -744,7 +747,7 @@ function PhotoParticles({ photos, mode, onClearExpanded }) {
 }
 
 // Scene setup
-function Scene({ currentTheme, gestureState, photos, onClearExpandedPhotos }) {
+function Scene({ currentTheme, gestureState, photos, onClearExpandedPhotos, onGetExpandedPhotos }) {
   const groupRef = useRef()
   const { camera } = useThree()
   const [seed, setSeed] = useState(0)
@@ -817,6 +820,7 @@ function Scene({ currentTheme, gestureState, photos, onClearExpandedPhotos }) {
         photos={photos}
         mode={gestureState?.mode || 'TREE'}
         onClearExpanded={onClearExpandedPhotos}
+        onGetExpanded={onGetExpandedPhotos}
       />
       <StarMesh theme={theme} />
       
@@ -850,6 +854,7 @@ export default function ChristmasTree() {
   const [photos, setPhotos] = useState([])
   const [photosLoaded, setPhotosLoaded] = useState(false)
   const clearExpandedPhotosRef = useRef(null)
+  const getExpandedPhotosRef = useRef(null)
   const audioRef = useRef(null)
   const videoRef = useRef(null)
   const handLandmarkerRef = useRef(null)
@@ -1277,9 +1282,38 @@ export default function ChristmasTree() {
   const clearAllPhotos = () => {
     if (photos.length === 0) return
 
-    if (confirm('确定要清除所有照片吗？')) {
-      setPhotos([])
-      localStorage.removeItem('christmasPhotos')
+    // Get currently expanded photos
+    const expandedSet = getExpandedPhotosRef.current ? getExpandedPhotosRef.current() : new Set()
+
+    if (expandedSet.size === 0) {
+      alert('没有放大的照片需要清除')
+      return
+    }
+
+    if (confirm(`确定要清除 ${expandedSet.size} 张放大的照片吗？`)) {
+      // Filter out expanded photos
+      const remainingPhotos = photos.filter((photo, i) => !expandedSet.has(i))
+      setPhotos(remainingPhotos)
+
+      // Update localStorage
+      try {
+        const photosToSave = remainingPhotos.map(p => ({
+          id: p.id,
+          imageData: p.imageData,
+          width: p.width,
+          height: p.height,
+          treePos: p.treePos,
+          heartPos: p.heartPos
+        }))
+        localStorage.setItem('christmasPhotos', JSON.stringify(photosToSave))
+      } catch (err) {
+        console.error('Failed to update localStorage:', err)
+      }
+
+      // Clear expanded state
+      if (clearExpandedPhotosRef.current) {
+        clearExpandedPhotosRef.current()
+      }
     }
   }
 
@@ -1303,6 +1337,7 @@ export default function ChristmasTree() {
           gestureState={gestureState}
           photos={photos}
           onClearExpandedPhotos={(clearFn) => clearExpandedPhotosRef.current = clearFn}
+          onGetExpandedPhotos={(getFn) => getExpandedPhotosRef.current = getFn}
         />
         <OrbitControls
           enablePan={true}
@@ -1327,10 +1362,10 @@ export default function ChristmasTree() {
             📷 Add Photo
           </button>
           <button className="elegant-btn" onClick={clearAllPhotos}>
-            🗑️ Clear All Photos
+            🗑️ Delete Expanded
           </button>
           <button className="elegant-btn" onClick={clearExpandedPhotos}>
-            ✖ Clear Expanded
+            ✖ Shrink Expanded
           </button>
         </div>
 
