@@ -590,8 +590,161 @@ function Snowflakes() {
   )
 }
 
+// Photo Particles Component
+function PhotoParticles({ photos, mode, onClearExpanded }) {
+  const meshRefs = useRef([])
+  const { camera } = useThree()
+  const [expandedPhotos, setExpandedPhotos] = useState(new Set())
+
+  // Expose clear function through callback
+  useEffect(() => {
+    if (onClearExpanded) {
+      onClearExpanded(() => setExpandedPhotos(new Set()))
+    }
+  }, [onClearExpanded])
+
+  useFrame((state, delta) => {
+    // Skip updates in SCATTER mode
+    if (mode === 'SCATTER') return
+
+    meshRefs.current.forEach((mesh, i) => {
+      if (!mesh || !photos[i]) return
+
+      const photo = photos[i]
+      const time = state.clock.elapsedTime
+
+      // Expanded photo logic - override all other modes
+      if (expandedPhotos.has(i)) {
+        // Each photo gets a unique floating position based on its index
+        // Use a pseudo-random but consistent position for each photo
+        const angle = (i * 2.4) % (Math.PI * 2)
+        const radius = 8 + (i % 3) * 2 // Radius between 8-12 (closer)
+        const height = 5.5 + ((i % 5) - 2) * 2 // Height variation (reduced)
+
+        const baseX = Math.cos(angle) * radius
+        const baseY = height
+        const baseZ = Math.sin(angle) * radius
+
+        // Add gentle floating animation
+        const floatX = Math.sin(time * 0.8 + i * 0.5) * 1
+        const floatY = Math.cos(time * 1.2 + i * 0.7) * 0.8
+        const floatZ = Math.sin(time * 0.6 + i * 0.9) * 1
+
+        const targetPos = [baseX + floatX, baseY + floatY, baseZ + floatZ]
+        mesh.position.x += (targetPos[0] - mesh.position.x) * 2.0 * delta
+        mesh.position.y += (targetPos[1] - mesh.position.y) * 2.0 * delta
+        mesh.position.z += (targetPos[2] - mesh.position.z) * 2.0 * delta
+
+        // Scale to 15x
+        const targetScale = 15.0
+        mesh.scale.x += (targetScale - mesh.scale.x) * 5.0 * delta
+        mesh.scale.y += (targetScale - mesh.scale.y) * 5.0 * delta
+        mesh.scale.z += (targetScale - mesh.scale.z) * 5.0 * delta
+
+        // Face camera
+        mesh.lookAt(camera.position)
+        mesh.material.opacity = 1
+        return
+      }
+
+      if (mode === 'HEART') {
+        // Heart mode - float around like small hearts
+        const target = photo.heartPos
+        mesh.position.x += (target[0] - mesh.position.x) * 2.0 * delta
+        mesh.position.y += (target[1] - mesh.position.y) * 2.0 * delta
+        mesh.position.z += (target[2] - mesh.position.z) * 2.0 * delta
+
+        // Enhanced floating animation - bob up and down
+        mesh.position.y += Math.sin(time * 1.5 + i * 0.8) * 0.03
+        // Gentle side-to-side drift
+        mesh.position.x += Math.cos(time * 0.8 + i * 0.6) * 0.02
+        mesh.position.z += Math.sin(time * 0.6 + i * 0.4) * 0.02
+
+        // Scale up 6x in heart mode
+        const targetScale = 6.0
+        mesh.scale.x += (targetScale - mesh.scale.x) * 2.0 * delta
+        mesh.scale.y += (targetScale - mesh.scale.y) * 2.0 * delta
+        mesh.scale.z += (targetScale - mesh.scale.z) * 2.0 * delta
+
+        // Face camera
+        mesh.lookAt(camera.position)
+
+        // Fade in
+        mesh.material.opacity = Math.min(1, mesh.material.opacity + delta * 2)
+      } else if (mode === 'TREE') {
+        // Tree mode - hang on tree
+        const target = photo.treePos
+        mesh.position.x += (target[0] - mesh.position.x) * 2.0 * delta
+        mesh.position.y += (target[1] - mesh.position.y) * 2.0 * delta
+        mesh.position.z += (target[2] - mesh.position.z) * 2.0 * delta
+
+        // Scale back to 1x in tree mode
+        const targetScale = 1.0
+        mesh.scale.x += (targetScale - mesh.scale.x) * 2.0 * delta
+        mesh.scale.y += (targetScale - mesh.scale.y) * 2.0 * delta
+        mesh.scale.z += (targetScale - mesh.scale.z) * 2.0 * delta
+
+        // Slight sway
+        mesh.rotation.z = Math.sin(time * 0.5 + i) * 0.1
+
+        // Face camera
+        mesh.lookAt(camera.position)
+
+        // Fade in
+        mesh.material.opacity = Math.min(1, mesh.material.opacity + delta * 2)
+      }
+    })
+  })
+
+  // Don't render anything in SCATTER mode
+  if (mode === 'SCATTER') {
+    return null
+  }
+
+  return (
+    <group>
+      {photos.map((photo, i) => (
+        <mesh
+          key={photo.id}
+          ref={el => meshRefs.current[i] = el}
+          position={photo.treePos}
+          onClick={(e) => {
+            e.stopPropagation()
+            // Toggle this photo's expanded state
+            setExpandedPhotos(prev => {
+              const newSet = new Set(prev)
+              if (newSet.has(i)) {
+                newSet.delete(i)
+              } else {
+                newSet.add(i)
+              }
+              return newSet
+            })
+          }}
+          onPointerOver={(e) => {
+            e.stopPropagation()
+            document.body.style.cursor = 'pointer'
+          }}
+          onPointerOut={(e) => {
+            e.stopPropagation()
+            document.body.style.cursor = 'auto'
+          }}
+        >
+          <planeGeometry args={[photo.width, photo.height]} />
+          <meshBasicMaterial
+            map={photo.texture}
+            transparent
+            opacity={1}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
 // Scene setup
-function Scene({ currentTheme, gestureState }) {
+function Scene({ currentTheme, gestureState, photos, onClearExpandedPhotos }) {
   const groupRef = useRef()
   const { camera } = useThree()
   const [seed, setSeed] = useState(0)
@@ -608,34 +761,43 @@ function Scene({ currentTheme, gestureState }) {
 
   useFrame((state, delta) => {
     if (groupRef.current && gestureState) {
-      // Gesture-based rotation
-      const threshold = 0.3
-      const speed = 1.2
+      // Gesture-based rotation - works in all modes
+      const threshold = 0.2
+      const speed = 1.5
       
-      if (gestureState.mode === 'SCATTER' && gestureState.hand.detected) {
-        // Edge rotation control
+      if (gestureState.hand.detected) {
+      // Hand controls rotation in all modes
         if (gestureState.hand.x > threshold) {
           gestureState.rotation.y += speed * delta * (gestureState.hand.x - threshold)
         } else if (gestureState.hand.x < -threshold) {
           gestureState.rotation.y += speed * delta * (gestureState.hand.x + threshold)
         }
         
-        if (gestureState.hand.y > threshold) {
-          gestureState.rotation.x += speed * delta * (gestureState.hand.y - threshold)
-        } else if (gestureState.hand.y < -threshold) {
-          gestureState.rotation.x += speed * delta * (gestureState.hand.y + threshold)
+        // Only allow up/down rotation in SCATTER mode
+        if (gestureState.mode === 'SCATTER') {
+          if (gestureState.hand.y > threshold) {
+            gestureState.rotation.x += speed * delta * (gestureState.hand.y - threshold)
+          } else if (gestureState.hand.y < -threshold) {
+            gestureState.rotation.x += speed * delta * (gestureState.hand.y + threshold)
+          }
+        } else {
+          // Keep x rotation at 0 for TREE and HEART modes
+          gestureState.rotation.x += (0 - gestureState.rotation.x) * 3.0 * delta
         }
-      } else if (gestureState.mode === 'TREE') {
-        // Gentle auto-rotation in tree mode (closed fist gesture)
-        gestureState.rotation.y += 0.15 * delta
-        gestureState.rotation.x += (0 - gestureState.rotation.x) * 2.0 * delta
-      } else if (gestureState.mode === 'HEART') {
-        // Slow rotation in heart mode
-        gestureState.rotation.y += 0.1 * delta
-        gestureState.rotation.x += (0 - gestureState.rotation.x) * 1.5 * delta
       } else {
-        // Slow drift in scatter mode
-        gestureState.rotation.y += 0.05 * delta
+        // Auto-rotation when no hand detected
+        if (gestureState.mode === 'TREE') {
+          // Gentle auto-rotation in tree mode (only left-right)
+          gestureState.rotation.y += 0.15 * delta
+          gestureState.rotation.x += (0 - gestureState.rotation.x) * 2.0 * delta
+        } else if (gestureState.mode === 'HEART') {
+          // Slow rotation in heart mode (only left-right)
+          gestureState.rotation.y += 0.1 * delta
+          gestureState.rotation.x += (0 - gestureState.rotation.x) * 1.5 * delta
+        } else {
+          // Slow drift in scatter mode
+          gestureState.rotation.y += 0.05 * delta
+        }
       }
       
       groupRef.current.rotation.y = gestureState.rotation.y
@@ -651,6 +813,11 @@ function Scene({ currentTheme, gestureState }) {
       <Particles points={treePoints} mode={gestureState?.mode || 'TREE'} />
       <Particles points={groundPoints} mode={gestureState?.mode || 'TREE'} />
       <Particles points={starPoints} mode={gestureState?.mode || 'TREE'} />
+      <PhotoParticles
+        photos={photos}
+        mode={gestureState?.mode || 'TREE'}
+        onClearExpanded={onClearExpandedPhotos}
+      />
       <StarMesh theme={theme} />
       
       <ambientLight intensity={0.8} />
@@ -680,11 +847,53 @@ export default function ChristmasTree() {
   const [cameraActive, setCameraActive] = useState(false)
   const [isMusicPlaying, setIsMusicPlaying] = useState(true)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [photos, setPhotos] = useState([])
+  const [photosLoaded, setPhotosLoaded] = useState(false)
+  const clearExpandedPhotosRef = useRef(null)
   const audioRef = useRef(null)
   const videoRef = useRef(null)
   const handLandmarkerRef = useRef(null)
   const lastVideoTimeRef = useRef(-1)
   const userInteractedRef = useRef(false)
+  const fileInputRef = useRef(null)
+
+  // Load photos from localStorage on mount
+  useEffect(() => {
+    const loadPhotos = async () => {
+      try {
+        const savedPhotos = localStorage.getItem('christmasPhotos')
+        if (savedPhotos) {
+          const photosData = JSON.parse(savedPhotos)
+          const loadedPhotos = []
+
+          for (const photoData of photosData) {
+            const img = new Image()
+            await new Promise((resolve) => {
+              img.onload = () => {
+                const texture = new THREE.Texture(img)
+                texture.needsUpdate = true
+
+                loadedPhotos.push({
+                  ...photoData,
+                  texture
+                })
+                resolve()
+              }
+              img.src = photoData.imageData
+            })
+          }
+
+          setPhotos(loadedPhotos)
+        }
+      } catch (error) {
+        console.error('Failed to load photos:', error)
+      } finally {
+        setPhotosLoaded(true)
+      }
+    }
+
+    loadPhotos()
+  }, [])
 
   // Auto-play music on load and on first user interaction
   useEffect(() => {
@@ -942,6 +1151,144 @@ export default function ChristmasTree() {
     }
   }
 
+  // Handle photo upload
+  const handlePhotoUpload = (event) => {
+    const files = event.target.files
+    if (!files || files.length === 0) return
+
+    // Check photo limit
+    if (photos.length >= 12) {
+      alert('最多只能添加12张照片哦！')
+      event.target.value = ''
+      return
+    }
+
+    const startIndex = photos.length // Current count before adding new photos
+
+    Array.from(files).forEach((file, fileIndex) => {
+      // Stop if already at limit
+      const currentIndex = startIndex + fileIndex
+      if (currentIndex >= 12) return
+
+      if (!file.type.startsWith('image/')) return
+
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const img = new Image()
+        img.onload = () => {
+          // Compress image for storage
+          const canvas = document.createElement('canvas')
+          const ctx = canvas.getContext('2d')
+
+          // Limit size for storage (max width 600px for better quality)
+          const maxWidth = 600
+          const scale = Math.min(1, maxWidth / img.width)
+          canvas.width = img.width * scale
+          canvas.height = img.height * scale
+
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+          const compressedImageData = canvas.toDataURL('image/jpeg', 0.8) // 80% quality
+
+          // Create texture from original image for better quality
+          const texture = new THREE.Texture(img)
+          texture.needsUpdate = true
+
+          // Much smaller size - like small ornaments
+          const aspectRatio = img.width / img.height
+          const baseSize = 0.35
+          const size = aspectRatio > 1
+            ? [baseSize * aspectRatio, baseSize]
+            : [baseSize, baseSize / aspectRatio]
+
+          // Position on spiral - random distribution with angle offset
+          const loops = 9
+          const u = 0.15 + Math.random() * 0.75 // Random between 0.15 to 0.90
+          const h = Math.pow(u, 1.6)
+          const y = CONFIG.TREE_HEIGHT * h + 0.2 // Don't subtract 5.5, Scene group already has offset
+
+          // Calculate base radius with branch waves
+          let baseR = Math.pow(1 - h, 1.1) * 3.2
+          const branchWave = Math.max(0, Math.sin((h * 5.8 + 0.15) * Math.PI * 2))
+          const branchFactor = 1.0 + 0.65 * branchWave
+          baseR *= branchFactor
+
+          // Follow spiral angle with extra random offset to spread out
+          const t = u * loops * Math.PI * 2
+          const angle = t + (Math.random() - 0.5) * Math.PI * 1.5 // Add ±135° random offset
+
+          // Position at outer edge of spiral
+          const r = baseR * 1.08
+          const x = Math.cos(angle) * r
+          const z = Math.sin(angle) * r
+
+          // Generate heart position - scattered in outer space, far from center
+          // Random spherical distribution in outer layer
+          const theta = Math.random() * Math.PI * 2
+          const phi = Math.acos(2 * Math.random() - 1)
+          const radius = 8 + Math.random() * 5 // 8-13 units from center (much farther)
+
+          const finalHeartX = radius * Math.sin(phi) * Math.cos(theta)
+          const finalHeartY = radius * Math.sin(phi) * Math.sin(theta) + 10 // Elevated around +10
+          const finalHeartZ = radius * Math.cos(phi)
+
+          const photo = {
+            id: Date.now() + Math.random(),
+            texture,
+            imageData: compressedImageData, // Save compressed data
+            width: size[0],
+            height: size[1],
+            treePos: [x, y, z],
+            heartPos: [finalHeartX, finalHeartY, finalHeartZ]
+          }
+
+          setPhotos(prev => {
+            const newPhotos = [...prev, photo]
+            // Save to localStorage (without texture object)
+            try {
+              const photosToSave = newPhotos.map(p => ({
+                id: p.id,
+                imageData: p.imageData,
+                width: p.width,
+                height: p.height,
+                treePos: p.treePos,
+                heartPos: p.heartPos
+              }))
+              localStorage.setItem('christmasPhotos', JSON.stringify(photosToSave))
+            } catch (err) {
+              console.error('Failed to save photos to localStorage:', err)
+              // If storage fails, just keep in memory
+            }
+            return newPhotos
+          })
+        }
+        img.src = e.target.result
+      }
+      reader.readAsDataURL(file)
+    })
+
+    // Reset input
+    event.target.value = ''
+  }
+
+  const triggerPhotoUpload = () => {
+    fileInputRef.current?.click()
+  }
+
+  const clearAllPhotos = () => {
+    if (photos.length === 0) return
+
+    if (confirm('确定要清除所有照片吗？')) {
+      setPhotos([])
+      localStorage.removeItem('christmasPhotos')
+    }
+  }
+
+  const clearExpandedPhotos = () => {
+    if (clearExpandedPhotosRef.current) {
+      clearExpandedPhotosRef.current()
+    }
+  }
+
   const displayName = 'W.Yr.';//userName.trim() || '[Name]'
   const themeName = COLOR_THEMES[currentTheme].name
 
@@ -951,7 +1298,12 @@ export default function ChristmasTree() {
         camera={{ position: [0, CONFIG.CAM_HEIGHT, CONFIG.CAM_DIST], fov: 40 }}
         style={{ background: '#000' }}
       >
-        <Scene currentTheme={currentTheme} gestureState={gestureState} />
+        <Scene
+          currentTheme={currentTheme}
+          gestureState={gestureState}
+          photos={photos}
+          onClearExpandedPhotos={(clearFn) => clearExpandedPhotosRef.current = clearFn}
+        />
         <OrbitControls
           enablePan={true}
           enableZoom={true}
@@ -971,6 +1323,15 @@ export default function ChristmasTree() {
           <button className="elegant-btn" onClick={toggleFullscreen}>
             {isFullscreen ? '⛶ Exit Fullscreen' : '⛶ Fullscreen'}
           </button>
+          <button className="elegant-btn" onClick={triggerPhotoUpload}>
+            📷 Add Photo
+          </button>
+          <button className="elegant-btn" onClick={clearAllPhotos}>
+            🗑️ Clear All Photos
+          </button>
+          <button className="elegant-btn" onClick={clearExpandedPhotos}>
+            ✖ Clear Expanded
+          </button>
         </div>
 
         <div className="controls-container">
@@ -989,6 +1350,16 @@ export default function ChristmasTree() {
           <div className="hint-text">Press 'H' to hide UI</div>
         </div>
       </div>
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        onChange={handlePhotoUpload}
+        style={{ display: 'none' }}
+      />
 
       {/* Webcam preview */}
       <div id="webcam-wrapper">
